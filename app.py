@@ -12,7 +12,7 @@ st.set_page_config(page_title='AKASH-Text SummarizationApp')
 # Display the logo at the top of the page
 st.image("IMG20241026120028[1].jpg")  # Adjust width as needed
 st.divider()  # 👈 Draws a horizontal rule 
-st.title(' AKASH App')
+st.title('AKASH-Text SummarizationApp App')
 st.divider()  # 👈 Draws a horizontal rule
 # get API Key
 client = Groq(
