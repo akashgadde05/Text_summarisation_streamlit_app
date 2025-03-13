@@ -8,9 +8,9 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
 
 # Page title
-st.set_page_config(page_title='PragyanAI-Text SummarizationApp')
+st.set_page_config(page_title='AKASH-Text SummarizationApp')
 # Display the logo at the top of the page
-st.image("PragyanAI_Transperent.png")  # Adjust width as needed
+st.image("IMG20241026120028[1].jpg")  # Adjust width as needed
 st.divider()  # 👈 Draws a horizontal rule
 st.title('🦜🔗 Text Summarization App')
 st.divider()  # 👈 Draws a horizontal rule
