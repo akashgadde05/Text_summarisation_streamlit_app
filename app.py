@@ -1,59 +1,58 @@
-import streamlit as st 
-from groq import Groq
-#from langchain.chat_models import ChatGroq
+import streamlit as st
 from langchain_groq import ChatGroq
-#from langchain.chat_models import ChatOpenAI
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.docstore.document import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
+import tempfile
+import os
 
-# Page title
-st.set_page_config(page_title='AKASH-Text SummarizationApp')
-# Display the logo at the top of the page
-st.image("IMG20241026120028[1].jpg")  # Adjust width as needed
-st.divider()  # 👈 Draws a horizontal rule 
-st.title('AKASH-Text Summarization App')
-st.divider()  # 👈 Draws a horizontal rule
-# get API Key
-client = Groq(
-    api_key=st.secrets["GROQ_API_KEY"],
-)
-def generate_response(txt):
-    # Instantiate the LLM model
-    #llm = ChatGroq(model_name="llama3-8b-8192", temperature=0, groq_api_key=groq_api_key)
-    llm = ChatGroq(model_name="llama3-8b-8192", temperature=0, groq_api_key=st.secrets["GROQ_API_KEY"])
-    #llm = OpenAI(temperature=0, openai_api_key=openai_api_key)
-    # Instantiate the LLM model with Groq API
-    #llm = ChatOpenAI(
-    #    model_name="llama3-8b-8192",
-    #    temperature=0,
-    #    openai_api_key=st.secrets["GROQ_API_KEY"],
-    #    openai_api_base="https://api.groq.com/openai/v1")
-   
-    # Split text
-    text_splitter = CharacterTextSplitter()
-    texts = text_splitter.split_text(txt)
-    # Create multiple documents
-    docs = [Document(page_content=t) for t in texts]
-    # Text summarization
-    chain = load_summarize_chain(llm, chain_type='map_reduce')
-    return chain.run(docs)
+# Streamlit UI setup
+st.set_page_config(page_title='Akash PDF Summarizer')
+st.title("📄 Akash - PDF Summarizer")
+st.subheader("Summarize any PDF using Groq's LLaMA 3 🚀")
+st.divider()
 
+# Upload PDF
+uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
 
-# Text input
-txt_input = st.text_area('Enter your text', '', height=200)
+# Summarize Button
+if uploaded_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
 
-# Form to accept user's text input for summarization
-result = []
-with st.form('summarize_form', clear_on_submit=True):
-    #openai_api_key = st.text_input('OpenAI API Key', type = 'password', disabled=not txt_input)
-    submitted = st.form_submit_button('Submit')
-    #if submitted and openai_api_key.startswith('sk-'):
-    with st.spinner('Calculating...'):
-        response = generate_response(txt_input)
-        result.append(response)
-           # del openai_api_key
+    with st.spinner("Reading and summarizing PDF..."):
+        try:
+            # Load PDF and extract text
+            loader = PyPDFLoader(tmp_path)
+            pages = loader.load()
 
-if len(result):
-    st.info(response)
-    
+            # Combine all pages into one string
+            full_text = "\n".join([page.page_content for page in pages])
+
+            # Split text
+            text_splitter = CharacterTextSplitter()
+            texts = text_splitter.split_text(full_text)
+            docs = [Document(page_content=t) for t in texts]
+
+            # Groq LLM via LangChain
+            llm = ChatGroq(
+                model_name="llama3-8b-8192",
+                temperature=0,
+                groq_api_key=st.secrets["GROQ_API_KEY"]
+            )
+
+            # Summarization Chain
+            chain = load_summarize_chain(llm, chain_type="map_reduce")
+            summary = chain.run(docs)
+
+            # Display result
+            st.success("✅ Summary Generated:")
+            st.write(summary)
+
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+
+        finally:
+            os.remove(tmp_path)  # Clean up temp file
