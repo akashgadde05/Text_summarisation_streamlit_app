@@ -6,5 +6,5 @@ groq
 tiktoken
 transformers
 pypdf
-
+fpdf
 
