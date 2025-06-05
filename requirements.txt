@@ -5,4 +5,6 @@ langchain-groq
 groq
 tiktoken
 transformers
- pip install pypdf
+pypdf
+
+
