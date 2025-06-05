@@ -1,69 +1,57 @@
 import streamlit as st
 from PyPDF2 import PdfReader
-from groq import Groq
-from langchain_groq import ChatGroq
 from langchain.docstore.document import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
-from fpdf import FPDF
+from langchain_groq import ChatGroq
 
-st.set_page_config(page_title='PDF Text Summarization with Groq')
+st.set_page_config(page_title='PDF Text Summarization App')
 
-st.title("AKASH - PDF Summarization App")
-st.divider()
-
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# Your Groq API Key from secrets
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
 def extract_text_from_pdf(pdf_file) -> str:
-    """Extract all text from uploaded PDF."""
-    reader = PdfReader(pdf_file)
+    """Extract text from uploaded PDF file"""
+    pdf = PdfReader(pdf_file)
     text = ""
-    for page in reader.pages:
-        text += page.extract_text() + "\n"
+    for page in pdf.pages:
+        text += page.extract_text() or ""
     return text
 
-def generate_summary(text: str) -> str:
-    llm = ChatGroq(
-        model_name="llama3-8b-8192",
-        temperature=0,
-        groq_api_key=st.secrets["GROQ_API_KEY"]
-    )
+def generate_response(txt):
+    llm = ChatGroq(model_name="llama3-8b-8192", temperature=0, groq_api_key=GROQ_API_KEY)
     text_splitter = CharacterTextSplitter()
-    texts = text_splitter.split_text(text)
+    texts = text_splitter.split_text(txt)
     docs = [Document(page_content=t) for t in texts]
-    chain = load_summarize_chain(llm, chain_type="map_reduce")
+    chain = load_summarize_chain(llm, chain_type='map_reduce')
     return chain.run(docs)
 
-def create_pdf(text: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    for line in text.split('\n'):
-        pdf.multi_cell(0, 10, line)
-    return pdf.output(dest='S').encode('latin1')
+st.title("PDF Text Summarization App")
 
-uploaded_file = st.file_uploader("Upload a PDF file for summarization", type=["pdf"])
+uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"])
 
-if uploaded_file is not None:
+if uploaded_pdf is not None:
     with st.spinner("Extracting text from PDF..."):
-        pdf_text = extract_text_from_pdf(uploaded_file)
+        extracted_text = extract_text_from_pdf(uploaded_pdf)
 
-    if pdf_text.strip() == "":
-        st.error("No extractable text found in the PDF.")
+    if extracted_text.strip():
+        st.subheader("Extracted Text")
+        st.write(extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else ""))  # preview first 1000 chars
+
+        if st.button("Summarize Extracted Text"):
+            with st.spinner("Summarizing..."):
+                summary = generate_response(extracted_text)
+            st.subheader("Summary")
+            st.write(summary)
+
+            # Download summary as text file
+            st.download_button(
+                label="Download Summary as TXT",
+                data=summary,
+                file_name="summary.txt",
+                mime="text/plain"
+            )
     else:
-        st.subheader("Extracted Text Preview:")
-        st.write(pdf_text[:1000] + "..." if len(pdf_text) > 1000 else pdf_text)
-
-        if st.button("Generate Summary"):
-            with st.spinner("Generating summary..."):
-                summary = generate_summary(pdf_text)
-                st.success("Summary generated!")
-                st.info(summary)
-
-                pdf_bytes = create_pdf(summary)
-                st.download_button(
-                    label="Download Summary as PDF",
-                    data=pdf_bytes,
-                    file_name="pdf_summary.pdf",
-                    mime="application/pdf"
-                )
+        st.error("No text could be extracted from the uploaded PDF.")
+else:
+    st.info("Please upload a PDF file to get started.")
