@@ -1,58 +1,61 @@
-import streamlit as st
+import streamlit as st 
+from groq import Groq
 from langchain_groq import ChatGroq
-from langchain_community.document_loaders import PyPDFLoader
 from langchain.docstore.document import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
-import tempfile
-import os
 
-# Streamlit UI setup
-st.set_page_config(page_title='Akash PDF Summarizer')
-st.title("📄 Akash - PDF Summarizer")
-st.subheader("Summarize any PDF using Groq's LLaMA 3 🚀")
+# Page title and layout
+st.set_page_config(page_title='AKASH-Text Summarization App')
+st.image("IMG20241026120028[1].jpg")
+st.divider()
+st.title('AKASH-Text Summarization App')
 st.divider()
 
-# Upload PDF
-uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+# Get Groq API key from Streamlit secrets
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# Summarize Button
-if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(uploaded_file.read())
-        tmp_path = tmp_file.name
+# Max input length for llama3-8b-8192 in free tier
+MAX_WORDS = 1500
 
-    with st.spinner("Reading and summarizing PDF..."):
-        try:
-            # Load PDF and extract text
-            loader = PyPDFLoader(tmp_path)
-            pages = loader.load()
+def generate_response(txt):
+    # Initialize the LLM model
+    llm = ChatGroq(
+        model_name="llama3-8b-8192", 
+        temperature=0, 
+        groq_api_key=st.secrets["GROQ_API_KEY"]
+    )
 
-            # Combine all pages into one string
-            full_text = "\n".join([page.page_content for page in pages])
+    # Split text
+    text_splitter = CharacterTextSplitter(chunk_size=800, chunk_overlap=50)
+    texts = text_splitter.split_text(txt)
+    docs = [Document(page_content=t) for t in texts]
 
-            # Split text
-            text_splitter = CharacterTextSplitter()
-            texts = text_splitter.split_text(full_text)
-            docs = [Document(page_content=t) for t in texts]
+    # Load summarization chain
+    chain = load_summarize_chain(llm, chain_type='map_reduce')
+    return chain.run(docs)
 
-            # Groq LLM via LangChain
-            llm = ChatGroq(
-                model_name="llama3-8b-8192",
-                temperature=0,
-                groq_api_key=st.secrets["GROQ_API_KEY"]
-            )
+# Text input
+txt_input = st.text_area('Enter your text', '', height=200)
 
-            # Summarization Chain
-            chain = load_summarize_chain(llm, chain_type="map_reduce")
-            summary = chain.run(docs)
+# Trim long input text automatically with a warning
+if txt_input and len(txt_input.split()) > MAX_WORDS:
+    st.warning(f"⚠️ Your input exceeds {MAX_WORDS} words. Trimming to fit model limits.")
+    txt_input = " ".join(txt_input.split()[:MAX_WORDS])
 
-            # Display result
-            st.success("✅ Summary Generated:")
-            st.write(summary)
+# Handle submit
+result = []
+with st.form('summarize_form', clear_on_submit=True):
+    submitted = st.form_submit_button('Submit')
+    if submitted and txt_input.strip():
+        with st.spinner('Summarizing...'):
+            try:
+                response = generate_response(txt_input)
+                result.append(response)
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
-
-        finally:
-            os.remove(tmp_path)  # Clean up temp file
+# Show result
+if result:
+    st.success("✅ Summary:")
+    st.info(result[0])
